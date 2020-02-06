@@ -1,13 +1,17 @@
-const inquirer = require("inquirer")
-const fs = require("fs")
-const Employee = require("./lib/Employee")
-const Enginner = require("./lib/Engineer")
-const Intern = require("./lib/Intern")
-const Manager = require("./lib/Manager")
+const inquirer = require("inquirer");
+const fs = require("fs");
+const util = require("util");
+const Employee = require("./lib/Employee");
+const Enginner = require("./lib/Engineer");
+const Intern = require("./lib/Intern");
+const Manager = require("./lib/Manager");
+const genHtml = require("./html/genHtml");
+const writeToFileAsync = util.promisify(fs.writeFile);
 
 let teamArray = [];
-let teamHtml = "";
-let i = "Yes";
+let wait = "Yes";
+
+init();
 
 function findSchool() {
     return inquirer
@@ -50,7 +54,7 @@ function newMember() {
         .prompt([{
             name: "name",
             type: "input",
-            message: "Please enter the team mamber name:"
+            message: "Please enter the team member name:"
         }, {
             name: "id",
             type: "input",
@@ -72,48 +76,113 @@ function newMember() {
         ])
 }
 
+function internTemplate(Intern) {
+    return `<div class="card shadow col-3 px-0 my-4 mx-4">
+        <div class="card-header bg-info text-white font-weight-bold display-5">
+            <h1>${Intern.name}</h1>
+            <h1> <i class="fas fa-user-graduate"></i> ${Intern.title}</h1>
+        </div>
+        <div class="card-body bg-light">
+            <ul class="list-group">
+                <li class="list-group-item">ID: ${Intern.id}</li>
+                <li class="list-group-item">Email: ${Intern.email}</li>
+                <li class="list-group-item">School: ${Intern.school.school}</li>
+            </ul>
+        </div>
+    </div>`
+}
+function engineerTemplate(Engineer) {
+    return `<div class="card shadow col-3 px-0 my-4 mx-4">
+        <div class="card-header bg-info text-white font-weight-bold display-5">
+            <h1>${Engineer.name}</h1>
+            <h1> <i class="fas fa-glasses"></i> ${Engineer.title}</h1>
+        </div>
+        <div class="card-body bg-light">
+            <ul class="list-group">
+                <li class="list-group-item">ID: ${Engineer.id}</li>
+                <li class="list-group-item">Email: ${Engineer.email}</li>
+                <li class="list-group-item">Github: ${Engineer.github.github}</li>
+            </ul>
+        </div>
+    </div>`
+}
+function managerTemplate(Manager) {
+    return `<div class="card shadow col-3 px-0 my-4 mx-4">
+        <div class="card-header bg-info text-white font-weight-bold">
+            <h1>${Manager.name}</h1>
+            <h1> <i class="fas fa-mug-hot"></i> ${Manager.title}</h1>
+        </div>
+        <div class="card-body bg-light">
+            <ul class="list-group">
+                <li class="list-group-item">ID: ${Manager.id}</li>
+                <li class="list-group-item">Email: ${Manager.email}</li>
+                <li class="list-group-item">Office Number: ${Manager.officeNumber.office}</li>
+            </ul>
+        </div>
+    </div>`
+}
+
 async function init() {
-    console.log("Initializing new team!")
+    console.log("Initializing new team")
     do {
 
         try {
             const employee = await newMember()
-            console.log(employee.name + ` has begun initialization`)
-            let dataInput;
-            let name = employee.name
-            let id = employee.id
-            let email = employee.email
-            let role = employee.role
-            console.log(name, id, email, role)
+            console.log("Team has begun initialization")
 
+            let dataInput;
+            let name = employee.name;
+            let id = employee.id;
+            let email = employee.email;
+            let role = employee.role;
 
             switch (role) {
                 case "Intern":
                     dataInput = await findSchool();
                     let intern = new Intern(name, id, email, dataInput)
-                    teamArray.push(intern)
+                    let internData = internTemplate(intern);
+                    teamArray.push(internData);
                     break;
 
                 case "Engineer":
                     dataInput = await findGithub();
                     let engineer = new Enginner(name, id, email, dataInput)
-                    teamArray.push(engineer)
+                    let engineerData = engineerTemplate(engineer);
+                    teamArray.push(engineerData);
                     break;
 
                 case "Manager":
                     dataInput = await findOfficeNumber();
                     let manager = new Manager(name, id, email, dataInput)
-                    teamArray.push(manager)
+                    let managerData = managerTemplate(manager);
+                    teamArray.push(managerData);
                     break;
             }
-
-            console.log(teamArray)
         } catch (err) {
             console.log(err)
         }
 
-        i = await nextEmployee()
-    } while (i.nextEmployee === "Yes")
-}
+        wait = await nextEmployee()
+    } while (wait.nextEmployee === "Yes")
 
-init();
+    try {
+        let startHtml = genHtml();
+        let endHtml =
+            `</div>
+                    </div>
+                </body>
+            </html>`
+        await writeToFileAsync(`./html/myTeam.html`, startHtml);
+        await fs.appendFile(`./html/myTeam.html`, teamArray + endHtml, function (err) {
+            if (err) {
+                console.log(err);
+            } else {
+                console.log("Success");
+            }
+
+
+        })
+    } catch (err) {
+        console.log(err)
+    }
+}
